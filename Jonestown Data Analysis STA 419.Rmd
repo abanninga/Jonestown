@@ -1,0 +1,261 @@
+---
+title: "Jonestown Data Analysis"
+author: "Alaine Banninga"
+date: "4/13/2020"
+output: html_document
+---
+
+```{r install-packages}
+library(tidyverse)
+```
+
+```{r upload-data}
+jonestown <- read.csv(file = "data/Jonestown.csv")
+```
+
+## Distribution of Jonestown Residents: Age, Gender, and Status
+### Univariate Summaries of Age, Gender, and Status
+```{r Age-histogram}
+# histogram of age variable
+ageHist <- ggplot(data = jonestown, aes(x = Age)) +
+  geom_histogram(bins = 25) +
+  ggtitle("Age of Jonestown Residents") +
+  xlab("Age (in years)")
+ageHist
+```
+
+```{r Gender-barplot}
+# relabeling gender variable
+jonestown$Gender <- fct_collapse(jonestown$Gender,
+                                 "Unknown" = c("","u"),
+                                 "Female" = "f",
+                                 "Male" = "m")
+
+# bar plot of gender
+ggplot(data = jonestown, aes(x = Gender)) +
+  geom_bar() +
+  ggtitle("Gender of Jonestown Residents") +
+  xlab("Gender")
+```
+
+```{r Status-barplots}
+# bar plot: death status counts (specific dates of death)
+ggplot(data = jonestown, aes(x = Status)) +
+  geom_bar() +
+  ggtitle("Death Status of Jonestown Residents (specific dates)") +
+  xlab("Death Status") +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+# Collapsing all residents listed as dead in dataset as "Died"
+newStatus <- fct_collapse(jonestown$Status,
+                          Died = c("Died","Died Prior to 11/18","Died Prior to 11/19","Died Prior to 11/20","Died Prior to 11/21","Died Prior to 11/22","Died Ryan Party"),
+                          Survived = "Survived")
+
+# bar plot: death status counts (dead or alive)
+ggplot(data = jonestown, aes(x = newStatus)) +
+  geom_bar() +
+  ggtitle("Death Status of Jonestown Residents (Dead or Alive)") +
+  xlab("Death Status") +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+### Place of Birth by Age, Gender, and Status
+```{r BirthCountry-vs-Age}
+# calculating number of residents per birth country
+table(jonestown$BirthCountry)
+mean(jonestown$Age, na.rm = TRUE) # mean age of Jonestown residents on 11/18/1978
+
+# bar plot: mean age of jonestown resident by birth country
+ageByPOB <- jonestown %>%
+  group_by(BirthCountry) %>%
+  summarise(mean_age = round(mean(Age, na.rm = TRUE), digits = 0)) %>%
+  ggplot(aes(x= reorder(BirthCountry, -mean_age), y=mean_age)) +
+    geom_bar(stat = "identity", fill = "steelblue")+
+    geom_text(aes(label=mean_age), vjust=-0.3, size=3.5)+
+    theme_minimal() +
+    ggtitle("Mean Age of Jonestown Residents by their Birth Country") +
+    ylab("Mean Age (in years)") +
+    xlab("Birth Country")
+ageByPOB
+```
+
+```{r BirthCountry-vs-Gender}
+t <- table(jonestown$BirthCountry, jonestown$Gender)
+
+# Percentages of Males, Females, and Unknown Gender Residents by Country
+prop.table(t,1)
+```
+
+```{r BirthCountry-vs-Status}
+t2 <- table(jonestown$BirthCountry, newStatus)
+
+# Death Status Percentages by Country
+prop.table(t2,1)
+```
+
+
+
+### Gender vs Age
+```{r Gender-vs-Age}
+# bar plot: mean age of jonestown residents by gender
+jonestown %>%
+  group_by(Gender) %>%
+  summarise(mean_age = round(mean(Age, na.rm = TRUE), digits = 0)) %>%
+  ggplot(aes(x=reorder(Gender, -mean_age), y=mean_age)) +
+    geom_bar(stat = "identity", fill = "steelblue")+
+    geom_text(aes(label=mean_age), vjust=-0.3, size=3.5)+
+    theme_minimal() +
+    ggtitle("Mean Age of Jonestown Residents by Gender") +
+    ylab("Mean Age (in years)") +
+    xlab("Gender")
+```
+
+```{r Gender-vs-Adults-Minors}
+# label blank values as "unknown"
+jonestown$AdultMinor <- fct_collapse(jonestown$AdultMinor,
+                                     "Unknown" = "")
+
+# bar plot showing number of adults and minors by gender
+ggplot(jonestown, aes(x = AdultMinor, fill = Gender)) +
+    geom_bar(position = position_dodge()) +
+    coord_flip() +
+    ggtitle("Distribution of Adults and Minors by Gender") +
+    ylab("Count") +
+    xlab("Adult/Minor Status on 11/18/1978") +
+    labs(fill = "Gender")
+```
+
+```{r AdultMinor-Gender-Status}
+# bar plot: count of each gender by death status, separated by adult/minor status
+ggplot(data=jonestown, aes(x = newStatus, fill = Gender)) +
+  geom_bar(stat = "count", position = position_dodge()) +
+  facet_grid(AdultMinor ~ .)
+```
+
+
+
+### Guyana Entry vs Status
+```{r LengthofTimeSpentinGuyana-vs-Status}
+# num days spent in Guyana total
+jonestown$daysSpent <- as.numeric(as.Date("1978-11-18") - jonestown$GuyanaEntry)
+
+# box plots of length of time spent in Guyana by death status
+ggplot(data = jonestown, aes(x = newStatus, y = daysSpent)) +
+  geom_boxplot() +
+  ggtitle("Length of Time Spent in Guyana vs Death Status") +
+  xlab("Death Status") +
+  ylab("Length of time in Guyana (in days)")
+```
+
+```{r Location-on-Nov11-1978-vs-Status}
+f <- table(jonestown$Location, newStatus)
+
+# Location on 11/18/1978 vs death status
+prop.table(f,1)
+# Most residents not in Jonestown, Guyana on 11/18/1978 survived
+```
+
+
+
+### Jonestown Residence vs Status
+```{r JTRes-vs-Status}
+# collapsing JTResidence into general types
+# e.g. Cottage 1 and Cottage 2 are now "Cottage"
+jonestown$JTResidence <- fct_collapse(jonestown$JTResidence,
+                                    "Not Known" = c("","Not Known"))
+jonestown$genRes <- trimws(gsub('[[:digit:]]+', '', jonestown$JTResidence))
+jonestown$genRes <- fct_collapse(jonestown$genRes,
+                                 "Cottage" = c("Cottage", "Cottage C"))
+
+# percentage bar plot of jonestown residence type vs death status
+ggplot(data = jonestown, aes(x = genRes, fill = newStatus)) +
+  geom_bar(position = "fill") +
+  ggtitle("Jonestown Residence vs Death Status") +
+  xlab("Jonestown Residence Type") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  ylab("Percentage of Residents Died/Survived") +
+  labs(fill = "Death Status")
+```
+
+```{r JTRes-Status-Gender}
+# bar plots of jonestown residence vs death status, separated by gender
+ggplot(data=jonestown, aes(x = genRes, fill = newStatus)) +
+  geom_bar(stat = "count", position = position_dodge()) +
+  facet_grid(Gender ~ .) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  ggtitle("Jonestown Residence vs Death Status by Gender") +
+  xlab("Jonestown Residence Type") +
+  ylab("Count of Residents Died/Survived") +
+  labs(fill = "Death Status")
+```
+
+
+
+
+
+## Place of Birth and its Relationship to Age
+### Univariate Summaries of Age, Birth Country, and Birth State
+```{r}
+# histogram of age
+ageHist
+```
+
+```{r birthCountry-hist-freq}
+# not very useful, most from USA
+ggplot(data = jonestown, aes(x = BirthCountry)) +
+  geom_bar(stat = "count")
+
+prop.table(table(jonestown$BirthCountry))
+# USA overwhelming majority, next largest proportion is Guyana at 2%
+```
+
+```{r birthState-bar-freq}
+ggplot(data = jonestown, aes(x = BirthState)) +
+  geom_bar(stat = "count") +
+  ggtitle("Number of Residents per Birth State") +
+  xlab("Birth State")
+
+prop.table(table(jonestown$BirthState))
+table(jonestown$BirthState)
+# highest proportions from CA, TX; lowest from AZ, DE, MA, NB, OR, RI, WI, WY
+```
+
+### Mean Age of Residents by their Jonestown Residence
+```{r meanAge-per-resType}
+# bar plot of mean age of residents by their Jonestown Residence type
+jonestown %>%
+  group_by(genRes) %>%
+  summarise(mean_age = round(mean(Age, na.rm = TRUE), digits = 0)) %>%
+  ggplot(aes(x=reorder(genRes, -mean_age), y=mean_age)) +
+    geom_bar(stat = "identity", fill = "steelblue")+
+    geom_text(aes(label=mean_age), vjust=-0.3, size=3.5)+
+    theme_minimal() +
+    ggtitle("Mean Age of Residents per Residence Type") +
+    ylab("Mean Age (in years)") +
+    xlab("Jonestown Residence Type")
+```
+
+### Mean Age of Residents by their Birth Country
+```{r age-by-birthCountry}
+ageByPOB # bar plot made earlier in analysis
+```
+
+### Mean Age of US Residents by their Birth State
+```{r age-by-birthState}
+# bar plot of mean age of US residents by birth state
+ageByState <- jonestown %>%
+  group_by(BirthState) %>%
+  summarise(mean_age = round(mean(Age, na.rm = TRUE), digits = 0)) %>%
+  ggplot(aes(x=reorder(BirthState, -mean_age), y=mean_age)) +
+    geom_bar(stat = "identity", fill = "steelblue")+
+    geom_text(aes(label=mean_age), vjust=-0.3, size=3.5)+
+    theme_minimal() +
+    ggtitle("Mean Age of Jonestown Residents by their Birth State") +
+    ylab("Mean Age (in years)") +
+    xlab("Birth State") +
+    theme(axis.text.x = element_text(angle = 90))
+ageByState
+```
+
