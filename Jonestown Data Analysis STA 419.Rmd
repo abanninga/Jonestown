@@ -2,7 +2,9 @@
 title: "Jonestown Data Analysis"
 author: "Alaine Banninga"
 date: "4/13/2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r install-packages}
@@ -16,6 +18,7 @@ jonestown <- read.csv(file = "data/Jonestown.csv")
 ## Distribution of Jonestown Residents: Age, Gender, and Status
 ### Univariate Summaries of Age, Gender, and Status
 ```{r Age-histogram}
+summary(jonestown$Age)
 # histogram of age variable
 ageHist <- ggplot(data = jonestown, aes(x = Age)) +
   geom_histogram(bins = 25) +
